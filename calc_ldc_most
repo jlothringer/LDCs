@@ -1,0 +1,80 @@
+pro calc_ldc_most, bins
+
+;Using CB11 method of interpolating mu to 100 points from 0.01 to 1
+
+rdlimbg_55cnc,'lte5243_4.33_+0.25_55Cnc.irfout.27',lamb,flux,mu,coeff
+
+;bins=[0.4,0.9]*10000
+
+;ftab_ext,'p822207no_pht.fits','WAVELENGTH',wave
+;ftab_ext,'p822207no_pht.fits','THROUGHPUT',through
+;ftab_ext,'p822207no_pht.fits','OPT_ELEM',opt_elem
+
+readcol,'most_transmission_functions.csv',lamda1,trans
+lambda1=lamda1
+sorted = sort(lamb)
+;stop
+lamb = lamb(sorted)
+flux=flux[*,sorted]
+;data=mrdfits('oco513010_raw_cleaned35x1d.fits',1)
+
+;good_through_waves = wave[where(wave[*,15] ne 0.0),15]
+;good_throughput = through[where(through[*,15] ne 0.0),15]
+
+ind1 = where(lamb ge lambda1[0])
+ind2 = where(lamb lt lambda1[-1])
+ind = cgsetintersection(ind1,ind2)
+good_waves = lamb(ind)
+good_flux = flux(*,ind)
+
+interpolated_throughput = interpol(trans,lambda1,good_waves)
+
+flux_through = dblarr(n_elements(mu),n_elements(good_waves))
+for i = 0,n_elements(mu)-1 do begin
+  ;Convolved
+  ;flux_through(i,*) = convol(reform(good_flux(i,*)), interpolated_throughput) * good_waves[*]
+  ;Just multiplied
+  flux_through(i,*) = good_flux(i,*) * interpolated_throughput * good_waves[*]
+endfor
+
+ind_mu = where(mu ge 0.1)
+good_mu = mu(ind_mu)
+good_flux_through = flux_through(ind_mu,*)
+
+linear_grid = indgen(100)*0.01+0.01
+
+good_mu_interpolated = linear_grid
+good_flux_through_interpolated = dblarr(n_elements(good_mu_interpolated),n_elements(good_waves))
+for j=0,n_elements(good_waves)-1 do begin
+  good_flux_through_interpolated[*,j]=interpol(good_flux_through[*,j],good_mu,good_mu_interpolated)
+endfor
+;good_flux_through_interpolated = interpol(good_flux_through,good_mu,good_mu_interpolated)
+;stop
+;bins = [3500,7000]
+ldc = fltarr(2,n_elements(bins)-1)
+;bins = [5500,6500,7500,8500,10000]
+for i=0,n_elements(bins)-2 do begin
+  a=[0.6,0.1]
+  one2 = where(good_waves lt bins[i+1])
+  one1 = where(good_waves gt bins[i])
+  one = cgsetintersection(one1,one2)
+  one_sum = total(good_flux_through_interpolated(*,one),2)
+  one_sum_norm = one_sum / one_sum(-1)
+  fit = curvefit(good_mu_interpolated,one_sum_norm,weights,a,sig,chisq=chi,/noderivative,function_name='limb_darkening')
+  scaled_weights = (fltarr(n_elements(good_mu_interpolated))+1)/(variance(one_sum_norm-fit))
+  fit = curvefit(good_mu_interpolated,one_sum_norm,scaled_weights,a,sig,chisq=chi,/noderivative,function_name='limb_darkening')
+  plot,good_mu_interpolated,one_sum_norm,title='Range: ' + string(bins[i]) + ' to ' +string(bins[i+1])
+  oplot,good_mu_interpolated,one_sum_norm,psym=5
+  oplot,good_mu_interpolated,fit,linestyle=5
+  oplot,good_mu_interpolated,fit,psym=4
+  limb_darkening,good_mu_interpolated,[0.657,0.115],y    ;Compare to values from Dragomir et al. 2013 w/ MOST
+  oplot,good_mu_interpolated,y,linestyle=3
+  oplot,good_mu_interpolated,y,psym=3
+  ldc[*,i] = a
+  stop
+endfor
+;Now do this for the other bin locations and fit coeff!
+;Won't need ot use limb_params and fit in rdlimbg then?
+
+stop
+end
