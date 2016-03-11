@@ -41,3 +41,8 @@ $RECYCLE.BIN/
 Network Trash Folder
 Temporary Items
 .apdisk
+*.27
+lte.LIMBDARK.chromo.GJ436.lgrad=8.tmaxch=8000.lmtop=3.8.lmin=1.8.pout1d4.T1M.27.gz
+*.gz
+sample_high_activity.txt
+lte.chromo.Teff=3416.logg=4.84.lgrad=8.tmaxch=8000.lmtop=6.lmin=4.pout1d4.27.sav
